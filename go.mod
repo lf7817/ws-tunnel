@@ -1,4 +1,4 @@
-module tunnel-server
+module ws-tunnel
 
 go 1.26
 

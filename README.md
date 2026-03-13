@@ -1,15 +1,15 @@
-# Tunnel Server
+# WS Tunnel
 
-基于 WebSocket 的**设备隧道中心服务器**：设备通过出站 WebSocket 接入中心，中心对外提供按设备 ID 的 HTTP 反向代理，使用户可通过浏览器访问设备本地的 Web 服务（如配置页、API），而无需与设备在同一局域网。
+基于 WebSocket 的 **ws-tunnel**：含**隧道中心**（tunnel-server）与**隧道客户端**（tunnel-client）。设备通过客户端出站连到中心，中心对外提供按设备 ID 的 HTTP 反向代理，使用户可通过浏览器访问设备本地的 Web 服务（如配置页、API），而无需与设备在同一局域网。
 
 适用于 4G/NAT 后的嵌入式设备、工控机、边缘网关等需要远程访问其本地 HTTP 服务的场景。
 
 ---
 
-## 项目是什么
+## 简介
 
-- **中心角色**：本仓库是「隧道中心服务器」的实现。设备主动用 WebSocket 连到本服务并注册 `device_id`，用户访问 `https://your-server/device/{device_id}/...` 时，请求经隧道转发到设备本地（如 `http://127.0.0.1:8080`），响应原样回传。
-- **设备角色**：设备端（隧道客户端）由其他项目实现，按同一协议连接本服务器并转发 HTTP。本仓库提供 `mock-device` 用于本地联调；设备端实现思路与技术细节见 [docs/CLIENT_IMPLEMENTATION.md](docs/CLIENT_IMPLEMENTATION.md)。
+- **隧道中心（tunnel-server）**：设备主动用 WebSocket 连到本服务并注册 `device_id`，用户访问 `https://your-server/device/{device_id}/...` 时，请求经隧道转发到设备本地（如 `http://127.0.0.1:8080`），响应原样回传。
+- **隧道客户端（tunnel-client）**：通用客户端，连接中心并将请求转发到设备本地 HTTP 服务，与业务解耦；实现思路与技术细节见 [docs/CLIENT_IMPLEMENTATION.md](docs/CLIENT_IMPLEMENTATION.md)。
 - **效果**：用户在浏览器打开 `https://your-server.com/device/my-device/` 即可看到该设备的配置页，无需与设备在同一局域网或做端口映射。
 
 ---
@@ -38,6 +38,8 @@
 
 ### 快速开始（本地 HTTP 验证）
 
+使用本仓库提供的 **tunnel-server**（隧道中心）与 **tunnel-client**（隧道客户端）。可从 GitHub Release 下载对应平台二进制，或从源码编译（见「如何编译」）。以下示例假设可执行文件在当前目录。
+
 1. **启动“设备本地服务”**（模拟设备上的 `127.0.0.1:8080`）：
 
    ```bash
@@ -51,7 +53,7 @@
    ```bash
    LISTEN_ADDR=:8081 \
    DEVICE_TOKENS="my-device=dev-token" \
-   go run ./cmd/tunnel-server
+   ./tunnel-server
    ```
 
    - **方式 B：配置文件**（推荐多设备；改文件保存即可，新连接按文件 mtime 自动加载，无需重启）
@@ -59,17 +61,17 @@
    ```bash
    # 新建 devices.conf，每行: device_id=token
    echo 'my-device=dev-token' > devices.conf
-   LISTEN_ADDR=:8081 DEVICE_TOKENS_FILE=devices.conf go run ./cmd/tunnel-server
+   LISTEN_ADDR=:8081 DEVICE_TOKENS_FILE=devices.conf ./tunnel-server
    ```
 
-3. **启动模拟设备**（连接中心并转发到本地 8080）：
+3. **启动隧道客户端**（连接中心并转发到本地 8080）：
 
    ```bash
    SERVER_WS="ws://127.0.0.1:8081/tunnel/device" \
    DEVICE_ID=my-device \
    TOKEN=dev-token \
    TARGET_BASE="http://127.0.0.1:8080" \
-   go run ./cmd/mock-device
+   ./tunnel-client
    ```
 
 4. **访问**：浏览器打开 `http://127.0.0.1:8081/device/my-device/`，应看到 8080 服务的响应。
@@ -101,13 +103,25 @@ RTK002=secret-token-2
 
 修改并保存该文件后，**新建立的设备连接**会按文件 mtime 自动读到最新配置，无需重启服务、无需发信号。
 
+### 环境变量（隧道客户端 `tunnel-client`）
+
+| 变量 | 默认 | 说明 |
+|------|------|------|
+| `SERVER_WS` | `ws://127.0.0.1:8081/tunnel/device` | 中心 WebSocket 地址 |
+| `DEVICE_ID` | `RTK001` | 设备唯一标识 |
+| `TOKEN` | `dev-token` | 鉴权令牌，与中心配置一致 |
+| `TARGET_BASE` | `http://127.0.0.1:8080` | 本地 HTTP 服务基地址 |
+| `REQUEST_TIMEOUT` | 30s | 单次本地请求超时 |
+| `RECONNECT_INITIAL` | 1s | 断线后首次重连间隔 |
+| `RECONNECT_MAX` | 60s | 重连间隔上限 |
+
 ### 协议与实现约定
 
 协议与实现细节见 [docs/REMOTE_ACCESS_TUNNEL_SERVER_SPEC.md](docs/REMOTE_ACCESS_TUNNEL_SERVER_SPEC.md)。
 
-### 设备端（客户端）如何实现
+### 隧道客户端
 
-设备端需主动用 WebSocket 连接中心、接收 `TunnelRequest`、向本地 HTTP 服务转发请求并把响应封装回传（含普通响应与 SSE 流式）。实现思路、协议字段、读/写模型、Header 过滤与流式响应等见 [docs/CLIENT_IMPLEMENTATION.md](docs/CLIENT_IMPLEMENTATION.md)。
+本仓库提供 **tunnel-client**，可直接在设备端使用。若需自研实现，设备端需主动用 WebSocket 连接中心、接收 `TunnelRequest`、向本地 HTTP 服务转发并把响应回传（含普通与 SSE 流式）。协议与实现要点见 [docs/CLIENT_IMPLEMENTATION.md](docs/CLIENT_IMPLEMENTATION.md)。
 
 ### 生产部署：WSS、HTTPS 与 Nginx
 
@@ -127,8 +141,8 @@ RTK002=secret-token-2
 ### Linux / macOS
 
 ```bash
-# 克隆仓库后进入项目目录
-cd tunnel-server
+# 克隆仓库后进入项目目录（目录名以实际为准，如 ws-tunnel）
+cd ws-tunnel
 
 # 下载依赖
 go mod download
@@ -136,15 +150,15 @@ go mod download
 # 编译隧道中心（产物：当前目录或指定输出）
 go build -o tunnel-server ./cmd/tunnel-server
 
-# 编译模拟设备（用于联调）
-go build -o mock-device ./cmd/mock-device
+# 编译隧道客户端（用于联调或部署在设备端）
+go build -o tunnel-client ./cmd/tunnel-client
 ```
 
 指定输出路径示例：
 
 ```bash
 go build -o bin/tunnel-server ./cmd/tunnel-server
-go build -o bin/mock-device ./cmd/mock-device
+go build -o bin/tunnel-client ./cmd/tunnel-client
 ```
 
 ### Windows
@@ -152,8 +166,8 @@ go build -o bin/mock-device ./cmd/mock-device
 在 **PowerShell** 或 **CMD** 中：
 
 ```powershell
-# 进入项目目录
-cd tunnel-server
+# 进入项目目录（目录名以实际为准，如 ws-tunnel）
+cd ws-tunnel
 
 # 下载依赖
 go mod download
@@ -161,15 +175,15 @@ go mod download
 # 编译隧道中心（生成 tunnel-server.exe）
 go build -o tunnel-server.exe ./cmd/tunnel-server
 
-# 编译模拟设备（生成 mock-device.exe）
-go build -o mock-device.exe ./cmd/mock-device
+# 编译隧道客户端（生成 tunnel-client.exe）
+go build -o tunnel-client.exe ./cmd/tunnel-client
 ```
 
 若希望输出到子目录：
 
 ```powershell
 go build -o bin/tunnel-server.exe ./cmd/tunnel-server
-go build -o bin/mock-device.exe ./cmd/mock-device
+go build -o bin/tunnel-client.exe ./cmd/tunnel-client
 ```
 
 ### 交叉编译示例
@@ -178,12 +192,14 @@ go build -o bin/mock-device.exe ./cmd/mock-device
 
   ```bash
   GOOS=windows GOARCH=amd64 go build -o tunnel-server.exe ./cmd/tunnel-server
+  GOOS=windows GOARCH=amd64 go build -o tunnel-client.exe ./cmd/tunnel-client
   ```
 
 - Windows 下编译 Linux 可执行文件（需安装 Go 并配置好环境变量）：
 
   ```powershell
   $env:GOOS="linux"; $env:GOARCH="amd64"; go build -o tunnel-server ./cmd/tunnel-server
+  $env:GOOS="linux"; $env:GOARCH="amd64"; go build -o tunnel-client ./cmd/tunnel-client
   ```
 
 ---
@@ -194,18 +210,21 @@ go build -o bin/mock-device.exe ./cmd/mock-device
 .
 ├── cmd/
 │   ├── tunnel-server/   # 隧道中心服务入口
-│   └── mock-device/     # 模拟设备端，用于本地联调
+│   └── tunnel-client/   # 通用隧道客户端，连接中心并转发到本地 HTTP
 ├── internal/
 │   ├── config/          # 配置加载（环境变量）
 │   ├── tunnel/          # WebSocket 隧道、设备连接表、协议
+│   ├── tunnelclient/    # 隧道客户端逻辑（写串行化、流式、重连）
 │   ├── httpproxy/       # /device/{id}/... HTTP 反代
 │   ├── httpx/            # Header 过滤等工具
 │   └── id/               # 请求 ID 生成
 ├── docs/
 │   ├── REMOTE_ACCESS_TUNNEL_SERVER_SPEC.md   # 协议与实现说明
-│   ├── CLIENT_IMPLEMENTATION.md              # 设备端（隧道客户端）实现说明
+│   ├── CLIENT_IMPLEMENTATION.md              # 隧道客户端实现说明
+│   ├── CLIENT_AS_GENERIC_TOOL.md             # 客户端通用化说明
 │   ├── LOCAL_HTTP_QUICKSTART.md              # 本地 HTTP 快速验证
-│   └── WSS_AND_NGINX.md                      # WSS、HTTPS 与 Nginx 部署
+│   ├── WSS_AND_NGINX.md                      # WSS、HTTPS 与 Nginx 部署
+│   └── SYSTEMD_DEPLOY.md                     # systemd 部署隧道中心
 ├── go.mod
 └── README.md
 ```

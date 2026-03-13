@@ -1,6 +1,6 @@
 # 生产部署：WSS、HTTPS 与 Nginx
 
-本文档说明如何通过 **Nginx 反向代理** 为 tunnel-server 提供 WSS（WebSocket over TLS）和 HTTPS，以及如何做负载与高可用。
+本文档说明如何通过 **Nginx 反向代理** 为本仓库的 **tunnel-server**（隧道中心）提供 WSS（WebSocket over TLS）和 HTTPS，以及如何做负载与高可用。设备端使用本仓库的 **tunnel-client** 连接中心即可。
 
 ---
 

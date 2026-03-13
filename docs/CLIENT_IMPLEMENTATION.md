@@ -1,6 +1,6 @@
 # 隧道客户端（设备端）实现说明
 
-本文档面向**设备端（隧道客户端）**的开发者：如何实现与 [tunnel-server](REMOTE_ACCESS_TUNNEL_SERVER_SPEC.md) 对接的客户端，使设备在 4G/NAT 后能通过出站 WebSocket 提供「本地 HTTP 服务」的远程访问能力。
+本文档面向**设备端（隧道客户端）**的开发者。本仓库已提供通用客户端 **tunnel-client**；若需自研实现，可按下文与隧道中心（[协议说明](REMOTE_ACCESS_TUNNEL_SERVER_SPEC.md)）对接，使设备在 4G/NAT 后通过出站 WebSocket 提供「本地 HTTP 服务」的远程访问能力。
 
 ---
 
@@ -168,10 +168,10 @@ wss://your-server.com/tunnel/device?device_id=my-device&token=your-secret-token
 
 ## 7. 参考实现
 
-本仓库中的 **`cmd/mock-device`** 是一个最简隧道客户端示例：
+本仓库中的 **`cmd/tunnel-client`** 是通用隧道客户端：
 
-- 从环境变量读取 `SERVER_WS`、`DEVICE_ID`、`TOKEN`、`TARGET_BASE`，拼出带 query 的 WebSocket URL 并连接。  
-- 单协程读 WebSocket，解析 TunnelRequest，对每条请求起 goroutine 调本地 HTTP，组 TunnelResponse 后写回。  
-- **注意**：当前 mock-device 未做**写串行化**（多请求同时完成时并发 `WriteMessage` 可能有问题），也未实现**流式响应**；仅适合本地联调。正式实现请按上文加上写锁/写队列与 SSE 流式逻辑。
+- 从环境变量读取 `SERVER_WS`、`DEVICE_ID`、`TOKEN`、`TARGET_BASE` 等，拼出带 query 的 WebSocket URL 并连接。  
+- 单协程读 WebSocket，写通过**单写协程 + channel** 串行化，支持**普通响应**与 **SSE 流式响应**（`response_start` → `response_chunk` → `response_end`）。  
+- **Hop-by-hop Header 过滤**、请求超时、**断线重连**（指数退避）均已实现，可直接用于联调或部署在设备端。
 
-运行示例见 [LOCAL_HTTP_QUICKSTART.md](LOCAL_HTTP_QUICKSTART.md)。
+运行示例见 [LOCAL_HTTP_QUICKSTART.md](LOCAL_HTTP_QUICKSTART.md)。客户端通用化说明见 [CLIENT_AS_GENERIC_TOOL.md](CLIENT_AS_GENERIC_TOOL.md)。

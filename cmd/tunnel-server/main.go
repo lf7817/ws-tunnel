@@ -5,15 +5,20 @@ import (
 	"net/http"
 	"time"
 
-	"tunnel-server/internal/config"
-	"tunnel-server/internal/httpproxy"
-	"tunnel-server/internal/tunnel"
+	"ws-tunnel/internal/config"
+	"ws-tunnel/internal/httpproxy"
+	"ws-tunnel/internal/tunnel"
 )
+
+var version string // 由构建时 -ldflags "-X main.version=..." 注入
 
 func main() {
 	cfg, err := config.LoadFromEnv()
 	if err != nil {
 		log.Fatalf("config error: %v", err)
+	}
+	if version != "" {
+		log.Printf("tunnel-server version=%s", version)
 	}
 
 	var tokenSource tunnel.TokenSource

@@ -15,6 +15,7 @@
 # Go binary（你的服务）
 /release
 /tunnel-server
+/tunnel-client
 
 # =========================
 

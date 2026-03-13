@@ -1,15 +1,15 @@
 [Unit]
-Description=RTK Tunnel Server - device WebSocket tunnel hub
+Description=WS Tunnel Server - device WebSocket tunnel hub
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-# 可执行文件：建议放 /usr/local/bin 或 /opt/rtk-tunnel-server
+# 可执行文件：建议放 /usr/local/bin 或 /opt/ws-tunnel
 ExecStart=/usr/local/bin/tunnel-server
 # 配置文件必须用绝对路径，保证任意 WorkingDirectory 下都能读到
 Environment=LISTEN_ADDR=:8081
-Environment=DEVICE_TOKENS_FILE=/etc/rtk-tunnel-server/devices.conf
+Environment=DEVICE_TOKENS_FILE=/etc/ws-tunnel/devices.conf
 Restart=on-failure
 RestartSec=5
 

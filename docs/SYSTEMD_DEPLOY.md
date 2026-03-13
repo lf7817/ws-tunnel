@@ -1,11 +1,13 @@
-# Ubuntu 24.04 使用 systemd 部署 tunnel-server
+# Ubuntu 24.04 使用 systemd 部署隧道中心（tunnel-server）
+
+本仓库提供 **tunnel-server**（隧道中心）与 **tunnel-client**（隧道客户端）。本文档仅描述在服务器上部署 **tunnel-server**；设备端将 **tunnel-client** 部署在设备上并配置 `SERVER_WS`、`DEVICE_ID`、`TOKEN`、`TARGET_BASE` 即可。
 
 ## 1. 推荐路径（保证能正确读到配置）
 
 | 内容         | 路径 |
 |--------------|------|
 | 可执行文件   | `/usr/local/bin/tunnel-server` |
-| 设备 token 文件 | `/etc/rtk-tunnel-server/devices.conf` |
+| 设备 token 文件 | `/etc/ws-tunnel/devices.conf` |
 
 环境变量 **必须用绝对路径** 指定 `DEVICE_TOKENS_FILE`，否则 systemd 的 WorkingDirectory 可能不是你以为的目录，相对路径会读错或读不到。
 
@@ -16,8 +18,8 @@
 ### 2.1 创建目录与配置文件
 
 ```bash
-sudo mkdir -p /etc/rtk-tunnel-server
-sudo nano /etc/rtk-tunnel-server/devices.conf
+sudo mkdir -p /etc/ws-tunnel
+sudo nano /etc/ws-tunnel/devices.conf
 ```
 
 在 `devices.conf` 里按行写 `device_id=token`，例如：
@@ -61,8 +63,8 @@ sudo systemctl status tunnel-server
 
 编辑 `/etc/systemd/system/tunnel-server.service`，修改：
 
-- `ExecStart=`：改为你实际的可执行文件路径（如 `/opt/rtk-tunnel-server/tunnel-server`）。
-- `Environment=DEVICE_TOKENS_FILE=`：改为你实际的 `devices.conf` 绝对路径（如 `/etc/rtk-tunnel-server/devices.conf`）。
+- `ExecStart=`：改为你实际的可执行文件路径（如 `/opt/ws-tunnel/tunnel-server`）。
+- `Environment=DEVICE_TOKENS_FILE=`：改为你实际的 `devices.conf` 绝对路径（如 `/etc/ws-tunnel/devices.conf`）。
 
 ---
 
@@ -76,7 +78,7 @@ sudo systemctl status tunnel-server    # 状态与最近日志
 journalctl -u tunnel-server -f         # 实时看日志
 ```
 
-修改 `/etc/rtk-tunnel-server/devices.conf` 后**无需重启服务**，新建立的设备连接会按文件 mtime 自动读到最新配置。
+修改 `/etc/ws-tunnel/devices.conf` 后**无需重启服务**，新建立的设备连接会按文件 mtime 自动读到最新配置。
 
 ---
 
@@ -86,7 +88,7 @@ journalctl -u tunnel-server -f         # 实时看日志
 
 ```bash
 sudo useradd -r -s /usr/sbin/nologin tunnel-server
-sudo chown -R tunnel-server:tunnel-server /etc/rtk-tunnel-server
+sudo chown -R tunnel-server:tunnel-server /etc/ws-tunnel
 sudo chown tunnel-server:tunnel-server /usr/local/bin/tunnel-server
 ```
 

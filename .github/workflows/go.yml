@@ -51,18 +51,10 @@ jobs:
               suffix=".exe"
             fi
 
-            out="dist/tunnel-server-${TAG}-${goos}-${goarch}${suffix}"
+            echo "Building tunnel-server and tunnel-client for $goos/$goarch"
 
-            echo "Building $out"
-
-            CGO_ENABLED=0 \
-            GOOS=$goos \
-            GOARCH=$goarch \
-            go build \
-              -trimpath \
-              -ldflags "-s -w -X main.version=${TAG}" \
-              -o "$out" \
-              ./cmd/tunnel-server
+            CGO_ENABLED=0 GOOS=$goos GOARCH=$goarch go build -trimpath -ldflags "-s -w -X main.version=${TAG}" -o "dist/tunnel-server-${TAG}-${goos}-${goarch}${suffix}" ./cmd/tunnel-server
+            CGO_ENABLED=0 GOOS=$goos GOARCH=$goarch go build -trimpath -ldflags "-s -w -X main.version=${TAG}" -o "dist/tunnel-client-${TAG}-${goos}-${goarch}${suffix}" ./cmd/tunnel-client
           done
 
           ls -lh dist/

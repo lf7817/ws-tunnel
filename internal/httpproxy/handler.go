@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"tunnel-server/internal/config"
-	"tunnel-server/internal/httpx"
-	"tunnel-server/internal/id"
-	"tunnel-server/internal/tunnel"
+	"ws-tunnel/internal/config"
+	"ws-tunnel/internal/httpx"
+	"ws-tunnel/internal/id"
+	"ws-tunnel/internal/tunnel"
 )
 
 // 等待设备返回 response_start 的最大时间；流式 body 开始后不再用短超时，避免断掉 SSE。

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bufio"
 	"errors"
 	"os"
 	"strconv"
@@ -19,6 +20,7 @@ type Config struct {
 	PongWait            time.Duration
 	DeviceTokenByID     map[string]string
 	AllowAllWSOrigins   bool
+	DeviceTokensFile    string // 设备 token 文件路径，可选；连接时按 mtime 热加载
 }
 
 func LoadFromEnv() (Config, error) {
@@ -31,8 +33,14 @@ func LoadFromEnv() (Config, error) {
 		MaxBodyBytes:       envInt64("MAX_BODY_BYTES", 20<<20),                  // 20 MiB（含升级包上传等）
 		PingInterval:      envDuration("WS_PING_INTERVAL", 25*time.Second),
 		PongWait:          envDuration("WS_PONG_WAIT", 60*time.Second),
-		DeviceTokenByID:   parseDeviceTokens(os.Getenv("DEVICE_TOKENS")),
 		AllowAllWSOrigins: envBool("WS_ALLOW_ALL_ORIGINS", true),
+		DeviceTokensFile:  os.Getenv("DEVICE_TOKENS_FILE"),
+	}
+	if cfg.DeviceTokensFile != "" {
+		// 设备列表由 FileTokenSource 按需读取（mtime 缓存），此处不预加载
+		cfg.DeviceTokenByID = nil
+	} else {
+		cfg.DeviceTokenByID = parseDeviceTokens(os.Getenv("DEVICE_TOKENS"))
 	}
 
 	if !strings.HasPrefix(cfg.DevicePrefix, "/") {
@@ -57,6 +65,34 @@ func LoadFromEnv() (Config, error) {
 		return Config{}, errors.New("WS_PONG_WAIT and WS_PING_INTERVAL must be > 0")
 	}
 	return cfg, nil
+}
+
+// LoadDeviceTokensFromFile 从配置文件加载 device_id=token，每行一条，# 为注释。
+func LoadDeviceTokensFromFile(path string) (map[string]string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	out := map[string]string{}
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		kv := strings.SplitN(line, "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		id := strings.TrimSpace(kv[0])
+		tok := strings.TrimSpace(kv[1])
+		if id == "" || tok == "" {
+			continue
+		}
+		out[id] = tok
+	}
+	return out, sc.Err()
 }
 
 func parseDeviceTokens(raw string) map[string]string {

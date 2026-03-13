@@ -2,29 +2,32 @@ package tunnel
 
 import "sync"
 
-type DeviceHub struct {
-	mu      sync.RWMutex
-	byID    map[string]*DeviceConn
-	tokens  map[string]string
-	onClose func(deviceID string)
+// TokenSource 提供设备 token 查询（由 config 包实现：静态 map 或配置文件 mtime 缓存）。
+type TokenSource interface {
+	ExpectedToken(deviceID string) (string, bool)
+	HasConfiguredTokens() bool
 }
 
-func NewDeviceHub(deviceTokenByID map[string]string) *DeviceHub {
-	cp := map[string]string{}
-	for k, v := range deviceTokenByID {
-		cp[k] = v
-	}
+type DeviceHub struct {
+	mu     sync.RWMutex
+	byID   map[string]*DeviceConn
+	source TokenSource
+}
+
+func NewDeviceHub(source TokenSource) *DeviceHub {
 	return &DeviceHub{
 		byID:   map[string]*DeviceConn{},
-		tokens: cp,
+		source: source,
 	}
 }
 
 func (h *DeviceHub) ExpectedToken(deviceID string) (string, bool) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	t, ok := h.tokens[deviceID]
-	return t, ok
+	return h.source.ExpectedToken(deviceID)
+}
+
+// HasConfiguredTokens 是否配置了设备 token 白名单（非空则只允许列表内设备）
+func (h *DeviceHub) HasConfiguredTokens() bool {
+	return h.source.HasConfiguredTokens()
 }
 
 func (h *DeviceHub) Register(deviceID string, conn *DeviceConn) (replaced *DeviceConn) {

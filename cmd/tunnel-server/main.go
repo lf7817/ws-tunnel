@@ -16,7 +16,18 @@ func main() {
 		log.Fatalf("config error: %v", err)
 	}
 
-	hub := tunnel.NewDeviceHub(cfg.DeviceTokenByID)
+	var tokenSource tunnel.TokenSource
+	if cfg.DeviceTokensFile != "" {
+		src, err := config.FileTokenSource(cfg.DeviceTokensFile)
+		if err != nil {
+			log.Fatalf("device tokens file %s: %v", cfg.DeviceTokensFile, err)
+		}
+		tokenSource = src
+		log.Printf("device tokens from file: %s (reload on connect when mtime changes)", cfg.DeviceTokensFile)
+	} else {
+		tokenSource = config.StaticTokenSource(cfg.DeviceTokenByID)
+	}
+	hub := tunnel.NewDeviceHub(tokenSource)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc(cfg.TunnelDevicePath, tunnel.DeviceWSHandler(hub, cfg.AllowAllWSOrigins, cfg.PingInterval, cfg.PongWait))

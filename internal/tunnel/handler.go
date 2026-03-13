@@ -25,9 +25,8 @@ func DeviceWSHandler(hub *DeviceHub, allowAllOrigins bool, pingInterval, pongWai
 			}
 		} else {
 			// If token map is configured, and device_id missing from map, treat as unauthorized.
-			// This matches \"static_map\" intent: only listed devices allowed.
-			// If you want allow-any-device, leave DEVICE_TOKENS empty.
-			if len(hub.tokens) > 0 {
+			// If you want allow-any-device, leave DEVICE_TOKENS / DEVICE_TOKENS_FILE empty.
+			if hub.HasConfiguredTokens() {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}

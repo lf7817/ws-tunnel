@@ -44,12 +44,22 @@
    python3 -m http.server 8080
    ```
 
-2. **启动隧道中心**：
+2. **启动隧道中心**（二选一）：
+
+   - **方式 A：环境变量**（适合少量设备）
 
    ```bash
    LISTEN_ADDR=:8081 \
    DEVICE_TOKENS="my-device=dev-token" \
    go run ./cmd/tunnel-server
+   ```
+
+   - **方式 B：配置文件**（推荐多设备；改文件保存即可，新连接按文件 mtime 自动加载，无需重启）
+
+   ```bash
+   # 新建 devices.conf，每行: device_id=token
+   echo 'my-device=dev-token' > devices.conf
+   LISTEN_ADDR=:8081 DEVICE_TOKENS_FILE=devices.conf go run ./cmd/tunnel-server
    ```
 
 3. **启动模拟设备**（连接中心并转发到本地 8080）：
@@ -73,11 +83,23 @@
 | `LISTEN_ADDR` | `:8081` | 服务监听地址 |
 | `DEVICE_PREFIX` | `/device/` | 用户访问路径前缀 |
 | `TUNNEL_DEVICE_PATH` | `/tunnel/device` | WebSocket 隧道路径 |
-| `DEVICE_TOKENS` | （空） | 设备鉴权，格式 `id=token,id2=token2` |
+| `DEVICE_TOKENS_FILE` | （空） | 设备 token 文件路径；设置后设备列表从该文件加载，**忽略** `DEVICE_TOKENS` |
+| `DEVICE_TOKENS` | （空） | 设备鉴权（仅当未设置 `DEVICE_TOKENS_FILE` 时生效），格式 `id=token,id2=token2` |
 | `REQUEST_TIMEOUT` | 30s | 单次转发请求超时 |
 | `WS_PING_INTERVAL` / `WS_PONG_WAIT` | 25s / 60s | 隧道心跳 |
 | `WS_ALLOW_ALL_ORIGINS` | true | 是否允许任意 WebSocket Origin |
 | `MAX_BODY_BYTES` | 20MiB | 请求/响应 body 上限 |
+
+**设备 token 文件格式**（`DEVICE_TOKENS_FILE`）：纯文本，每行一条 `device_id=token`，`#` 开头为注释。示例：
+
+```text
+# 设备 ID=token，每行一个
+my-device=dev-token
+RTK001=secret-token-1
+RTK002=secret-token-2
+```
+
+修改并保存该文件后，**新建立的设备连接**会按文件 mtime 自动读到最新配置，无需重启服务、无需发信号。
 
 ### 协议与实现约定
 
